@@ -104,6 +104,7 @@
   textarea{min-height:70px; resize:vertical;}
   .sn-row{display:flex; gap:8px;}
   .sn-row input{flex:1; font-family:var(--mono);}
+  .sn-row textarea{flex:1;}
   .two-col{display:flex; gap:10px;}
   .two-col > div{flex:1;}
   .btn{
@@ -174,7 +175,7 @@
     font-size:10px; color:var(--muted); text-align:center;
   }
   .item-card .body{flex:1; min-width:0;}
-  .item-card .name{font-weight:700; font-size:15px;}
+  .item-card .name{font-weight:700; font-size:15px; white-space:pre-line; word-break:break-word;}
   .item-card .sn{
     font-family:var(--mono); font-size:12.5px; color:var(--accent-dark);
     background:#FBEADF; display:inline-block; padding:1px 6px; border-radius:4px; margin-top:3px;
@@ -295,7 +296,7 @@
 
     <label>ชื่อทรัพย์สิน <span class="req">*</span></label>
     <div class="sn-row">
-      <input type="text" id="fName" placeholder="พิมพ์ หรือ สแกนข้อความ (OCR)" style="font-family:var(--sans);">
+      <textarea id="fName" rows="2" placeholder="พิมพ์ หรือ สแกนข้อความ (OCR) — คงรูปแบบตัวอักษรและการขึ้นบรรทัดตามต้นฉบับ" style="font-family:var(--sans); min-height:58px;"></textarea>
       <button type="button" class="btn btn-outline" id="btnScanName">▦ สแกน</button>
     </div>
 
@@ -583,8 +584,9 @@
   var scanMsg = document.getElementById("scanMsg");
   var btnScan = document.getElementById("btnScan");
   var scanHint = document.getElementById("scanHint");
-  var zxingReader = null;
-  var ZXING_URL = "https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js";
+  var zxingControls = null;
+  var zxingWanted = false;
+  var ZXING_URL = "https://unpkg.com/@zxing/browser@0.1.5";
 
   var hasNativeDetector = ("BarcodeDetector" in window);
   var hasCamera = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
@@ -664,7 +666,7 @@
     s.onerror = function(){ fail(); };
     document.head.appendChild(s);
   }
-  function loadZxing(done, fail){ loadScriptOnce(ZXING_URL, "ZXing", done, fail); }
+  function loadZxing(done, fail){ loadScriptOnce(ZXING_URL, "ZXingBrowser", done, fail); }
   var TESSERACT_URL = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
   function loadTesseract(done, fail){ loadScriptOnce(TESSERACT_URL, "Tesseract", done, fail); }
 
@@ -702,14 +704,23 @@
       return;
     }
 
-    // fallback: ZXing (optional, loaded on demand)
+    // fallback: ZXing browser (optional, loaded on demand)
     scanMsg.textContent = "กำลังโหลดตัวสแกนสำรอง...";
+    zxingWanted = true;
     loadZxing(function(){
+      if(!zxingWanted){ return; }
       try {
-        zxingReader = new window.ZXing.BrowserMultiFormatReader();
+        var reader = new window.ZXingBrowser.BrowserMultiFormatReader();
         scanMsg.textContent = "เล็งกล้องไปที่บาร์โค้ด / QR โค้ด — สแกนไม่ติด? กดปุ่มถ่ายรูปด้านล่าง";
-        zxingReader.decodeFromVideoDevice(undefined, "scanVideo", function(result){
-          if(result){ onScanned(result.getText ? result.getText() : String(result.text || "")); }
+        reader.decodeFromConstraints(
+          { video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } }, audio: false },
+          scanVideo,
+          function(result){
+            if(result && zxingWanted){ onScanned(result.getText ? result.getText() : String(result.text || "")); }
+          }
+        ).then(function(controls){
+          if(!zxingWanted){ try { controls.stop(); } catch(e){} }
+          else { zxingControls = controls; }
         }).catch(function(err){
           scanMsg.textContent = cameraErrorMessage(err);
         });
@@ -717,13 +728,14 @@
         scanMsg.textContent = cameraErrorMessage(e);
       }
     }, function(){
-      scanMsg.textContent = "โหลดตัวสแกนสำรองไม่ได้ (ต้องใช้อินเทอร์เน็ต) กรุณาพิมพ์หมายเลขเอง";
+      scanMsg.textContent = "โหลดตัวสแกนสำรองไม่ได้ (ต้องใช้อินเทอร์เน็ต) กรุณาพิมพ์หมายเลขเอง หรือกดถ่ายรูปแล้วอ่านข้อมูล";
     });
   }
 
   function stopScan(){
     if(scanTimer){ clearInterval(scanTimer); scanTimer = null; }
-    if(zxingReader){ try { zxingReader.reset(); } catch(e){} zxingReader = null; }
+    zxingWanted = false;
+    if(zxingControls){ try { zxingControls.stop(); } catch(e){} zxingControls = null; }
     if(scanStream){
       var tracks = scanStream.getTracks();
       for(var i=0;i<tracks.length;i++){ tracks[i].stop(); }
@@ -793,23 +805,51 @@
     reader.readAsDataURL(file);
   }
 
-  function decodeBarcodeFromCanvas(canvas, dataUrl, cb){
+  function rotateCanvas90(src){
+    var c = document.createElement("canvas");
+    c.width = src.height; c.height = src.width;
+    var ctx = c.getContext("2d");
+    ctx.translate(c.width, 0);
+    ctx.rotate(Math.PI / 2);
+    ctx.drawImage(src, 0, 0);
+    return c;
+  }
+
+  // try one canvas with native detector or ZXing; cb(value|null)
+  function decodeOneCanvas(cv, cb){
     if(hasNativeDetector){
       try {
-        new window.BarcodeDetector().detect(canvas).then(function(codes){
-          cb(codes && codes.length ? (codes[0].rawValue || "") : null);
+        new window.BarcodeDetector().detect(cv).then(function(codes){
+          cb(codes && codes.length ? (codes[0].rawValue || null) : null);
         }).catch(function(){ cb(null); });
       } catch(e){ cb(null); }
       return;
     }
-    loadZxing(function(){
-      try {
-        var r = new window.ZXing.BrowserMultiFormatReader();
-        r.decodeFromImageUrl(dataUrl).then(function(res){
-          cb(res && res.getText ? res.getText() : null);
-        }).catch(function(){ cb(null); });
-      } catch(e){ cb(null); }
-    }, function(){ cb(null); });
+    try {
+      var r = new window.ZXingBrowser.BrowserMultiFormatReader();
+      r.decodeFromCanvas(cv).then(function(res){
+        cb(res && res.getText ? res.getText() : null);
+      }).catch(function(){ cb(null); });
+    } catch(e){ cb(null); }
+  }
+
+  // try several versions of the photo: original, enhanced, rotated 90 degrees
+  function decodeBarcodeFromCanvas(canvas, dataUrl, cb){
+    function go(){
+      var enhanced = preprocessForOcr(canvas);
+      var attempts = [canvas, enhanced, rotateCanvas90(canvas), rotateCanvas90(enhanced)];
+      var idx = 0;
+      function next(){
+        if(idx >= attempts.length){ cb(null); return; }
+        var cv = attempts[idx++];
+        decodeOneCanvas(cv, function(v){
+          if(v){ cb(v); } else { next(); }
+        });
+      }
+      next();
+    }
+    if(hasNativeDetector){ go(); return; }
+    loadZxing(go, function(){ cb(null); });
   }
 
   var ocrWorker = null;
@@ -852,7 +892,7 @@
   function cleanOcrText(t){
     t = String(t || "").replace(/\r/g, "");
     t = t.replace(/([\u0E00-\u0E7F])[ \t]+(?=[\u0E00-\u0E7F])/g, "$1");
-    t = t.replace(/[ \t]{2,}/g, " ");
+    t = t.replace(/[ \t]+\n/g, "\n");
     return t.replace(/^\s+|\s+$/g, "");
   }
 
@@ -893,7 +933,8 @@
   }
 
   document.getElementById("btnOcrUse").addEventListener("click", function(){
-    var t = document.getElementById("ocrText").value.replace(/\s*\n+\s*/g, " ");
+    var t = document.getElementById("ocrText").value;
+    if(scanTargetId === "fSn"){ t = t.replace(/\s*\n+\s*/g, " "); }
     if(!t.replace(/\s+/g, "")){ showToast("ยังไม่มีข้อความให้ใช้"); return; }
     applyScannedValue(t, true);
   });
@@ -939,8 +980,8 @@
       all.type = "button";
       all.className = "btn btn-primary btn-block";
       all.style.cssText = "margin-bottom:6px;";
-      all.textContent = "ใช้ทุกบรรทัด (รวมเป็นชื่อเดียว)";
-      all.addEventListener("click", function(){ applyScannedValue(lines.join(" "), true); });
+      all.textContent = "ใช้ข้อความทั้งหมด (คงรูปแบบต้นฉบับ)";
+      all.addEventListener("click", function(){ applyScannedValue(String(text || ""), true); });
       ocrLines.insertBefore(all, ocrLines.firstChild);
     }
   }
