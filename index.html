@@ -295,7 +295,7 @@
 
     <label>ชื่อทรัพย์สิน <span class="req">*</span></label>
     <div class="sn-row">
-      <input type="text" id="fName" placeholder="พิมพ์ หรือ สแกนบาร์โค้ด/QR" style="font-family:var(--sans);">
+      <input type="text" id="fName" placeholder="พิมพ์ หรือ สแกนข้อความ (OCR)" style="font-family:var(--sans);">
       <button type="button" class="btn btn-outline" id="btnScanName">▦ สแกน</button>
     </div>
 
@@ -589,15 +589,18 @@
   }
 
   var scanTargetId = "fSn";
+  var ocrOnly = false;
 
   btnScan.addEventListener("click", function(){
     scanTargetId = "fSn";
+    ocrOnly = false;
     startScan();
   });
 
   document.getElementById("btnScanName").addEventListener("click", function(){
     scanTargetId = "fName";
-    startScan();
+    ocrOnly = true;
+    scanPhotoInput.click();
   });
 
   document.getElementById("btnCancelScan").addEventListener("click", function(){
@@ -765,6 +768,7 @@
         var dataUrl = canvas.toDataURL("image/jpeg", 0.85);
         ocrImg.src = dataUrl; ocrImg.style.display = "block";
         ocrStatus.textContent = "กำลังหาบาร์โค้ด/QR ในรูป...";
+        if(ocrOnly){ runOcr(canvas); return; }
         decodeBarcodeFromCanvas(canvas, dataUrl, function(value){
           if(value){ applyScannedValue(value, false); }
           else { runOcr(canvas); }
@@ -797,7 +801,7 @@
   }
 
   function runOcr(canvas){
-    ocrStatus.textContent = "ไม่พบบาร์โค้ด กำลังอ่านข้อความจากรูป (ครั้งแรกอาจใช้เวลา 10-40 วินาที และต้องใช้อินเทอร์เน็ต)...";
+    ocrStatus.textContent = (ocrOnly ? "" : "ไม่พบบาร์โค้ด ") + "กำลังอ่านข้อความจากรูป (ครั้งแรกอาจใช้เวลา 10-40 วินาที และต้องใช้อินเทอร์เน็ต)...";
     loadTesseract(function(){
       window.Tesseract.createWorker("eng+tha").then(function(worker){
         return worker.recognize(canvas).then(function(ret){
@@ -836,6 +840,15 @@
       b.setAttribute("data-v", lines[j]);
       b.addEventListener("click", function(ev){ applyScannedValue(ev.currentTarget.getAttribute("data-v"), true); });
       ocrLines.appendChild(b);
+    }
+    if(scanTargetId === "fName" && lines.length > 1){
+      var all = document.createElement("button");
+      all.type = "button";
+      all.className = "btn btn-primary btn-block";
+      all.style.cssText = "margin-bottom:6px;";
+      all.textContent = "ใช้ทุกบรรทัด (รวมเป็นชื่อเดียว)";
+      all.addEventListener("click", function(){ applyScannedValue(lines.join(" "), true); });
+      ocrLines.insertBefore(all, ocrLines.firstChild);
     }
   }
 
