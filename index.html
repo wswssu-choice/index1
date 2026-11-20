@@ -1,0 +1,1242 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ทะเบียนทรัพย์สิน 7-Eleven</title>
+<style>
+  :root{
+    --bg:#FAF7F2;
+    --surface:#FFFFFF;
+    --ink:#2B2B2B;
+    --muted:#8A8375;
+    --accent:#E8631C;
+    --accent-dark:#B94E14;
+    --green:#1B7A3D;
+    --border:#DDD6C7;
+    --danger:#C4432B;
+    --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Thai", "Leelawadee UI", "Thonburi", sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    font-size:15px;
+    line-height:1.5;
+    padding-bottom:76px;
+    -webkit-tap-highlight-color:transparent;
+  }
+  header{
+    background:var(--ink);
+    color:#fff;
+    padding:16px 16px 14px 16px;
+    position:sticky;
+    top:0;
+    z-index:20;
+  }
+  header h1{
+    margin:0;
+    font-size:18px;
+    font-weight:700;
+    letter-spacing:.2px;
+  }
+  header .sub{
+    color:#C9C4B8;
+    font-size:12.5px;
+    margin-top:2px;
+  }
+  .summary-bar{
+    display:flex;
+    gap:10px;
+    padding:10px 16px;
+    background:var(--surface);
+    border-bottom:1px solid var(--border);
+  }
+  .summary-chip{
+    flex:1;
+    background:var(--bg);
+    border:1px dashed var(--border);
+    border-radius:8px;
+    padding:8px 10px;
+    text-align:center;
+  }
+  .summary-chip .num{
+    font-family:var(--mono);
+    font-size:19px;
+    font-weight:700;
+    color:var(--accent-dark);
+    display:block;
+  }
+  .summary-chip .lbl{
+    font-size:11px;
+    color:var(--muted);
+  }
+  main{padding:14px 14px 8px 14px;}
+  .panel{display:none;}
+  .panel.active{display:block;}
+
+  label{
+    display:block;
+    font-size:13px;
+    font-weight:600;
+    margin:14px 0 6px 0;
+    color:var(--ink);
+  }
+  label .req{color:var(--danger);}
+  input[type="text"], input[type="number"], textarea, select{
+    width:100%;
+    padding:11px 12px;
+    border:1px solid var(--border);
+    border-radius:8px;
+    background:var(--surface);
+    font-size:15px;
+    font-family:var(--sans);
+    color:var(--ink);
+  }
+  input:focus, textarea:focus, select:focus{
+    outline:none;
+    border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(232,99,28,0.15);
+  }
+  textarea{min-height:70px; resize:vertical;}
+  .sn-row{display:flex; gap:8px;}
+  .sn-row input{flex:1; font-family:var(--mono);}
+  .two-col{display:flex; gap:10px;}
+  .two-col > div{flex:1;}
+  .btn{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+    padding:11px 16px;
+    border-radius:8px;
+    border:1px solid transparent;
+    font-size:14.5px;
+    font-weight:600;
+    cursor:pointer;
+    font-family:var(--sans);
+  }
+  .btn-primary{background:var(--accent); color:#fff;}
+  .btn-primary:active{background:var(--accent-dark);}
+  .btn-outline{background:var(--surface); border:1px solid var(--border); color:var(--ink);}
+  .btn-outline:active{background:var(--bg);}
+  .btn-danger{background:#fff; border:1px solid var(--danger); color:var(--danger);}
+  .btn-block{width:100%;}
+  .btn-sm{padding:8px 10px; font-size:13px;}
+  .btn:disabled{opacity:.45; cursor:not-allowed;}
+
+  .photo-box{
+    margin-top:8px;
+    border:1px dashed var(--border);
+    border-radius:10px;
+    background:var(--surface);
+    min-height:150px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+    position:relative;
+  }
+  .photo-box img{width:100%; height:auto; display:block; max-height:280px; object-fit:cover;}
+  .photo-empty{color:var(--muted); font-size:13px; text-align:center; padding:20px;}
+  .photo-actions{display:flex; gap:8px; margin-top:8px;}
+  .photo-actions .btn{flex:1;}
+
+  .hint{font-size:12px; color:var(--muted); margin-top:4px;}
+  .hint.warn{color:var(--accent-dark);}
+
+  .form-actions{margin-top:20px; display:flex; gap:10px;}
+  .form-actions .btn{flex:1;}
+
+  /* list */
+  .search-row{display:flex; gap:8px; margin-bottom:12px;}
+  .search-row input{flex:1;}
+  .item-card{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:10px;
+    margin-bottom:12px;
+    padding:12px;
+    display:flex;
+    gap:12px;
+  }
+  .item-card .thumb{
+    width:66px; height:66px; border-radius:8px; object-fit:cover; flex-shrink:0;
+    background:var(--bg); border:1px solid var(--border);
+  }
+  .item-card .thumb-empty{
+    width:66px; height:66px; border-radius:8px; flex-shrink:0;
+    background:var(--bg); border:1px dashed var(--border);
+    display:flex; align-items:center; justify-content:center;
+    font-size:10px; color:var(--muted); text-align:center;
+  }
+  .item-card .body{flex:1; min-width:0;}
+  .item-card .name{font-weight:700; font-size:15px;}
+  .item-card .sn{
+    font-family:var(--mono); font-size:12.5px; color:var(--accent-dark);
+    background:#FBEADF; display:inline-block; padding:1px 6px; border-radius:4px; margin-top:3px;
+  }
+  .item-card .meta{font-size:12.5px; color:var(--muted); margin-top:5px;}
+  .item-card .meta b{color:var(--ink); font-weight:600;}
+  .item-card .note{font-size:12.5px; color:var(--muted); margin-top:4px; font-style:italic;}
+  .item-card .row-actions{display:flex; gap:6px; margin-top:8px;}
+  .empty-state{
+    text-align:center; color:var(--muted); padding:50px 20px; font-size:13.5px;
+  }
+
+  /* export panel */
+  .export-card{
+    background:var(--surface); border:1px solid var(--border); border-radius:10px;
+    padding:14px; margin-bottom:12px;
+  }
+  .export-card h3{margin:0 0 4px 0; font-size:14.5px;}
+  .export-card p{margin:0 0 10px 0; font-size:12.5px; color:var(--muted);}
+
+  /* bottom nav */
+  .bottom-nav{
+    position:fixed; bottom:0; left:0; right:0;
+    background:var(--surface);
+    border-top:1px solid var(--border);
+    display:flex;
+    z-index:30;
+    padding-bottom:env(safe-area-inset-bottom, 0);
+  }
+  .bottom-nav button{
+    flex:1; background:none; border:none; padding:10px 4px 8px 4px;
+    font-family:var(--sans); font-size:12px; color:var(--muted);
+  }
+  .bottom-nav button .ic{display:block; font-size:19px; margin-bottom:2px;}
+  .bottom-nav button.active{color:var(--accent-dark); font-weight:700;}
+
+  /* overlays */
+  .overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,0.92);
+    z-index:100; display:none; flex-direction:column;
+  }
+  .overlay.show{display:flex;}
+  .overlay video{width:100%; flex:1; object-fit:cover; background:#000;}
+  .overlay .frame-guide{
+    position:absolute; left:8%; right:8%; top:38%; bottom:38%;
+    border:2px solid var(--accent); border-radius:10px; pointer-events:none;
+  }
+  .overlay-bar{
+    padding:14px; display:flex; gap:10px; background:#111;
+  }
+  .overlay-bar .btn{flex:1;}
+  .overlay-msg{color:#fff; text-align:center; padding:8px; font-size:12.5px;}
+
+  .photo-view{
+    position:fixed; inset:0; background:rgba(0,0,0,0.92); z-index:100;
+    display:none; align-items:center; justify-content:center; flex-direction:column;
+  }
+  .photo-view.show{display:flex;}
+  .photo-view img{max-width:94%; max-height:80%; border-radius:6px;}
+  .photo-view .btn{margin-top:16px;}
+
+  .toast{
+    position:fixed; left:50%; bottom:90px; transform:translateX(-50%);
+    background:var(--ink); color:#fff; padding:10px 18px; border-radius:20px;
+    font-size:13px; z-index:200; opacity:0; transition:opacity .2s; pointer-events:none;
+    max-width:88%; text-align:center;
+  }
+  .toast.show{opacity:1;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>ทะเบียนทรัพย์สิน</h1>
+  <div class="sub">ระบบจัดเก็บข้อมูลอุปกรณ์ &amp; ทรัพย์สิน 7-Eleven</div>
+  <div class="sub" style="margin-top:3px;">แนะนำให้เปิดด้วย Google Chrome เพื่อใช้ฟังก์ชันสแกนบาร์โค้ดผ่านกล้องได้เต็มรูปแบบ</div>
+</header>
+
+<div class="summary-bar">
+  <div class="summary-chip"><span class="num" id="sumCount">0</span><span class="lbl">รายการ</span></div>
+  <div class="summary-chip"><span class="num" id="sumQty">0</span><span class="lbl">จำนวนรวม</span></div>
+  <div class="summary-chip"><span class="num" id="sumBranch">0</span><span class="lbl">สาขา</span></div>
+</div>
+
+<main>
+
+  <!-- PANEL: ADD -->
+  <section class="panel active" id="panel-add">
+
+    <label>รูปถ่ายทรัพย์สิน</label>
+    <div class="photo-box" id="photoBox">
+      <div class="photo-empty" id="photoEmptyMsg">ยังไม่มีรูปถ่าย<br>แตะปุ่มด้านล่างเพื่อถ่ายรูป</div>
+    </div>
+    <div class="photo-actions">
+      <button type="button" class="btn btn-outline" id="btnTakePhoto">📷 ถ่าย/เลือกรูป</button>
+      <button type="button" class="btn btn-outline" id="btnRemovePhoto" style="display:none;">🗑 ลบรูป</button>
+    </div>
+    <input type="file" accept="image/*" id="fileInput" style="display:none;">
+
+    <div class="two-col">
+      <div>
+        <label>วันที่บันทึก <span class="req">*</span></label>
+        <input type="date" id="fDate">
+      </div>
+      <div>
+        <label>ผู้บันทึก <span class="req">*</span></label>
+        <input type="text" id="fRecordedBy" placeholder="ชื่อ-นามสกุล">
+      </div>
+    </div>
+
+    <label>หมายเลข S/N หรือหมายเลขทรัพย์สิน <span class="req">*</span></label>
+    <div class="sn-row">
+      <input type="text" id="fSn" placeholder="พิมพ์ หรือ สแกนบาร์โค้ด/QR">
+      <button type="button" class="btn btn-outline" id="btnScan">▦ สแกน</button>
+    </div>
+    <div class="hint" id="scanHint">กล้องสแกนอัตโนมัติจะพร้อมใช้เมื่อเปิดผ่านเบราว์เซอร์ที่รองรับ (Chrome บน Android) หากไม่รองรับ กรุณาพิมพ์หมายเลขเอง</div>
+    <div class="hint warn" id="dupSnHint" style="display:none;"></div>
+
+    <label>ชื่อทรัพย์สิน <span class="req">*</span></label>
+    <div class="sn-row">
+      <input type="text" id="fName" placeholder="พิมพ์ หรือ สแกนบาร์โค้ด/QR" style="font-family:var(--sans);">
+      <button type="button" class="btn btn-outline" id="btnScanName">▦ สแกน</button>
+    </div>
+
+    <label>จำนวน <span class="req">*</span></label>
+    <input type="number" id="fQty" min="1" value="1" inputmode="numeric">
+
+    <label>สถานที่จัดเก็บ</label>
+    <input type="text" id="fLocation" placeholder="เช่น โกดัง A ชั้น 2 โซน 3">
+
+    <label>สาขาที่นำเข้าโกดัง</label>
+    <input type="text" id="fBranch" placeholder="เช่น บ้านสันต้นบง 1 (24069)">
+
+    <label>หมายเหตุเพิ่มเติม</label>
+    <textarea id="fNote" placeholder="ตำหนิ / สภาพสินค้า / ข้อมูลอื่นๆ"></textarea>
+
+    <div class="form-actions">
+      <button type="button" class="btn btn-outline btn-block" id="btnClearForm">ล้างฟอร์ม</button>
+      <button type="button" class="btn btn-primary btn-block" id="btnSaveItem">✓ บันทึกรายการ</button>
+    </div>
+    <div id="editingNotice" class="hint warn" style="display:none; margin-top:10px;">กำลังแก้ไขรายการเดิม — กดบันทึกเพื่ออัปเดต</div>
+  </section>
+
+  <!-- PANEL: LIST -->
+  <section class="panel" id="panel-list">
+    <div class="search-row">
+      <input type="text" id="searchBox" placeholder="ค้นหา: ชื่อ / S/N / สาขา / สถานที่">
+    </div>
+    <div id="listContainer"></div>
+  </section>
+
+  <!-- PANEL: EXPORT -->
+  <section class="panel" id="panel-export">
+    <div class="export-card">
+      <h3>📄 ส่งออกเป็น CSV</h3>
+      <p>เปิดได้ด้วย Excel โดยตรง เหมาะสำหรับส่งต่อให้ทีมสำนักงาน (ไม่รวมรูปภาพ)</p>
+      <button type="button" class="btn btn-primary btn-block" id="btnExportCsv">ดาวน์โหลดไฟล์ CSV</button>
+    </div>
+    <div class="export-card">
+      <h3>📦 ส่งออก CSV พร้อมรูปภาพ (ไฟล์ ZIP)</h3>
+      <p>ได้ไฟล์ ZIP 1 ไฟล์ ข้างในมีทั้ง CSV และรูปภาพทุกรายการ (ตั้งชื่อไฟล์รูปอ้างอิงกับแถวใน CSV ให้อัตโนมัติ) แตกไฟล์แล้วเปิดดูรูปคู่กับตารางได้เลย — หมายเหตุ: รูปจะเป็นไฟล์แยกในโฟลเดอร์ photos ไม่ใช่รูปที่ฝังอยู่ในเซลล์ตาราง เพราะไฟล์ CSV เก็บได้เฉพาะตัวอักษร</p>
+      <button type="button" class="btn btn-primary btn-block" id="btnExportCsvZip">ดาวน์โหลดไฟล์ ZIP (CSV + รูปภาพ)</button>
+    </div>
+    <div class="export-card">
+      <h3>💾 สำรองข้อมูลทั้งหมด (JSON)</h3>
+      <p>รวมรูปภาพและทุกข้อมูล ใช้สำหรับสำรองไว้ หรือย้ายไปเปิดในเครื่องอื่น</p>
+      <button type="button" class="btn btn-outline btn-block" id="btnExportJson">ดาวน์โหลดไฟล์สำรอง (.json)</button>
+    </div>
+    <div class="export-card">
+      <h3>📥 นำเข้าข้อมูล (รวมกับของเดิม)</h3>
+      <p>เลือกไฟล์ .json ที่เคยสำรองไว้ ระบบจะรวมรายการใหม่เข้ากับรายการที่มีอยู่ในเครื่องนี้</p>
+      <input type="file" accept="application/json,.json" id="importFileInput" style="display:none;">
+      <button type="button" class="btn btn-outline btn-block" id="btnImportJson">เลือกไฟล์เพื่อนำเข้า</button>
+    </div>
+    <div class="export-card" style="border-color:var(--danger);">
+      <h3 style="color:var(--danger);">⚠ ล้างข้อมูลทั้งหมดในเครื่องนี้</h3>
+      <p>ลบรายการทั้งหมดออกจากอุปกรณ์นี้ถาวร แนะนำให้สำรองข้อมูลก่อนทุกครั้ง</p>
+      <button type="button" class="btn btn-danger btn-block" id="btnClearAll">ล้างข้อมูลทั้งหมด</button>
+    </div>
+  </section>
+
+</main>
+
+<nav class="bottom-nav">
+  <button type="button" class="nav-btn active" data-panel="add"><span class="ic">➕</span>เพิ่มรายการ</button>
+  <button type="button" class="nav-btn" data-panel="list"><span class="ic">📋</span>รายการทั้งหมด</button>
+  <button type="button" class="nav-btn" data-panel="export"><span class="ic">⇅</span>ส่งออก/นำเข้า</button>
+</nav>
+
+<!-- SCAN OVERLAY -->
+<div class="overlay" id="scanOverlay">
+  <div style="position:relative; flex:1; overflow:hidden;">
+    <video id="scanVideo" autoplay playsinline muted></video>
+    <div class="frame-guide"></div>
+  </div>
+  <div class="overlay-msg" id="scanMsg">กำลังเปิดกล้อง...</div>
+  <div class="overlay-bar">
+    <button type="button" class="btn btn-outline" id="btnCancelScan" style="background:#333; color:#fff; border-color:#555;">ยกเลิก</button>
+  </div>
+</div>
+
+<!-- PHOTO VIEW OVERLAY -->
+<div class="photo-view" id="photoView">
+  <img id="photoViewImg" src="">
+  <button type="button" class="btn btn-outline" id="btnClosePhotoView" style="background:#fff;">ปิด</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  var STORAGE_KEY = "assetRegistry_v1";
+  var LAST_RECORDER_KEY = "assetRegistry_lastRecorder";
+  var items = [];
+  var editingId = null;
+  var currentPhotoData = null;
+  var scanStream = null;
+  var scanTimer = null;
+
+  // ---------- storage ----------
+  function loadItems(){
+    var raw = null;
+    try { raw = window.localStorage.getItem(STORAGE_KEY); } catch(e){ raw = null; }
+    if(!raw){ items = []; return; }
+    try { items = JSON.parse(raw); if(!items || !items.length){ items = items || []; } }
+    catch(e){ items = []; }
+  }
+
+  function saveItems(){
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+      return true;
+    } catch(e){
+      showToast("บันทึกไม่สำเร็จ: พื้นที่จัดเก็บในเครื่องเต็ม กรุณาส่งออกข้อมูลแล้วลบรายการเก่าบางส่วน");
+      return false;
+    }
+  }
+
+  function genId(){
+    return "it_" + Date.now() + "_" + Math.floor(Math.random()*100000);
+  }
+
+  function todayStr(){
+    var n = new Date();
+    function pad(x){ return x < 10 ? "0" + x : "" + x; }
+    return n.getFullYear() + "-" + pad(n.getMonth()+1) + "-" + pad(n.getDate());
+  }
+
+  function findDuplicateSn(sn, excludeId){
+    var target = String(sn || "").replace(/^\s+|\s+$/g, "").toLowerCase();
+    if(!target) return null;
+    for(var i=0;i<items.length;i++){
+      var it = items[i];
+      if(excludeId && it.id === excludeId) continue;
+      var existing = String(it.sn || "").replace(/^\s+|\s+$/g, "").toLowerCase();
+      if(existing === target){ return it; }
+    }
+    return null;
+  }
+
+  function prefillMetaFields(){
+    document.getElementById("fDate").value = todayStr();
+    var lastRecorder = "";
+    try { lastRecorder = window.localStorage.getItem(LAST_RECORDER_KEY) || ""; } catch(e){ lastRecorder = ""; }
+    document.getElementById("fRecordedBy").value = lastRecorder;
+  }
+
+  // ---------- toast ----------
+  var toastTimer = null;
+  function showToast(msg){
+    var t = document.getElementById("toast");
+    t.textContent = msg;
+    t.className = "toast show";
+    if(toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ t.className = "toast"; }, 2600);
+  }
+
+  // ---------- tabs ----------
+  var navButtons = document.querySelectorAll(".nav-btn");
+  for(var i=0;i<navButtons.length;i++){
+    navButtons[i].addEventListener("click", function(ev){
+      var target = ev.currentTarget.getAttribute("data-panel");
+      showPanel(target);
+    });
+  }
+
+  function showPanel(name){
+    var panels = document.querySelectorAll(".panel");
+    for(var i=0;i<panels.length;i++){ panels[i].className = "panel"; }
+    document.getElementById("panel-" + name).className = "panel active";
+    for(var j=0;j<navButtons.length;j++){
+      if(navButtons[j].getAttribute("data-panel") === name){
+        navButtons[j].className = "nav-btn active";
+      } else {
+        navButtons[j].className = "nav-btn";
+      }
+    }
+    if(name === "list"){ renderList(); }
+  }
+
+  // ---------- photo handling ----------
+  var fileInput = document.getElementById("fileInput");
+  var photoBox = document.getElementById("photoBox");
+  var photoEmptyMsg = document.getElementById("photoEmptyMsg");
+  var btnRemovePhoto = document.getElementById("btnRemovePhoto");
+
+  document.getElementById("btnTakePhoto").addEventListener("click", function(){
+    fileInput.click();
+  });
+
+  fileInput.addEventListener("change", function(ev){
+    var file = ev.target.files && ev.target.files[0];
+    if(!file) return;
+    compressImageFile(file, 900, 0.62, function(dataUrl){
+      currentPhotoData = dataUrl;
+      renderPhotoPreview();
+    });
+    fileInput.value = "";
+  });
+
+  btnRemovePhoto.addEventListener("click", function(){
+    currentPhotoData = null;
+    renderPhotoPreview();
+  });
+
+  function renderPhotoPreview(){
+    if(currentPhotoData){
+      photoBox.innerHTML = "";
+      var img = document.createElement("img");
+      img.src = currentPhotoData;
+      photoBox.appendChild(img);
+      btnRemovePhoto.style.display = "inline-flex";
+    } else {
+      photoBox.innerHTML = "";
+      photoBox.appendChild(photoEmptyMsg);
+      btnRemovePhoto.style.display = "none";
+    }
+  }
+
+  // resize + compress image using canvas, ES5-safe
+  function compressImageFile(file, maxWidth, quality, callback){
+    var reader = new FileReader();
+    reader.onload = function(e){
+      var img = new Image();
+      img.onload = function(){
+        var w = img.width, h = img.height;
+        if(w > maxWidth){
+          h = Math.round(h * (maxWidth / w));
+          w = maxWidth;
+        }
+        var canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        var ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, w, h);
+        var dataUrl;
+        try {
+          dataUrl = canvas.toDataURL("image/jpeg", quality);
+        } catch(err){
+          dataUrl = e.target.result;
+        }
+        callback(dataUrl);
+      };
+      img.onerror = function(){
+        showToast("ไม่สามารถอ่านไฟล์รูปภาพนี้ได้");
+      };
+      img.src = e.target.result;
+    };
+    reader.onerror = function(){
+      showToast("ไม่สามารถอ่านไฟล์รูปภาพนี้ได้");
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // ---------- barcode scan ----------
+  var scanOverlay = document.getElementById("scanOverlay");
+  var scanVideo = document.getElementById("scanVideo");
+  var scanMsg = document.getElementById("scanMsg");
+  var btnScan = document.getElementById("btnScan");
+  var scanHint = document.getElementById("scanHint");
+  var zxingReader = null;
+  var ZXING_URL = "https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js";
+
+  var hasNativeDetector = ("BarcodeDetector" in window);
+  var hasCamera = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+  var inLineApp = /Line\//i.test(navigator.userAgent || "");
+
+  if(inLineApp){
+    scanHint.textContent = "คุณเปิดผ่านแอป LINE ซึ่งมักบล็อกกล้อง กรุณากดเมนู ⋮ แล้วเลือก \"เปิดใน Chrome\" ก่อนสแกน";
+    scanHint.className = "hint warn";
+  } else if(!hasCamera){
+    scanHint.textContent = "เบราว์เซอร์นี้ไม่อนุญาตให้ใช้กล้อง (ต้องเปิดผ่านลิงก์ https:// ด้วย Chrome) กรุณาพิมพ์หมายเลขเอง";
+    scanHint.className = "hint warn";
+  } else if(!hasNativeDetector){
+    scanHint.textContent = "เครื่องนี้ใช้ตัวสแกนสำรอง (ต้องมีอินเทอร์เน็ตในการสแกนครั้งแรก) หรือพิมพ์หมายเลขเองได้";
+  }
+
+  var scanTargetId = "fSn";
+
+  btnScan.addEventListener("click", function(){
+    scanTargetId = "fSn";
+    startScan();
+  });
+
+  document.getElementById("btnScanName").addEventListener("click", function(){
+    scanTargetId = "fName";
+    startScan();
+  });
+
+  document.getElementById("btnCancelScan").addEventListener("click", function(){
+    stopScan();
+  });
+
+  function cameraErrorMessage(err){
+    var n = err && err.name ? err.name : "";
+    if(inLineApp){
+      return "แอป LINE บล็อกกล้อง กรุณากดเมนู ⋮ แล้วเลือก \"เปิดใน Chrome\"";
+    }
+    if(n === "NotAllowedError" || n === "SecurityError" || n === "PermissionDeniedError"){
+      return "ไม่ได้รับอนุญาตให้ใช้กล้อง: แตะไอคอนแม่กุญแจข้างช่องที่อยู่เว็บ > สิทธิ์ > กล้อง > อนุญาต แล้วลองสแกนใหม่";
+    }
+    if(n === "NotFoundError" || n === "DevicesNotFoundError"){
+      return "ไม่พบกล้องในอุปกรณ์นี้ กรุณาพิมพ์หมายเลขเอง";
+    }
+    if(n === "NotReadableError" || n === "TrackStartError"){
+      return "กล้องถูกใช้งานโดยแอปอื่นอยู่ กรุณาปิดแอปที่ใช้กล้องแล้วลองใหม่";
+    }
+    return "ไม่สามารถเปิดกล้องได้ (" + (n || "unknown") + ") กรุณาพิมพ์หมายเลขเอง";
+  }
+
+  function onScanned(value){
+    document.getElementById(scanTargetId).value = value;
+    if(scanTargetId === "fSn"){ checkDupSnLive(); }
+    showToast("สแกนสำเร็จ: " + value);
+    stopScan();
+  }
+
+  function openStream(callback, onFail){
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false })
+      .then(callback)
+      .catch(function(err){
+        // retry with plain video constraint (some devices reject facingMode)
+        if(err && (err.name === "OverconstrainedError" || err.name === "NotFoundError")){
+          navigator.mediaDevices.getUserMedia({ video: true, audio: false }).then(callback).catch(onFail);
+        } else {
+          onFail(err);
+        }
+      });
+  }
+
+  function loadZxing(done, fail){
+    if(window.ZXing){ done(); return; }
+    var s = document.createElement("script");
+    s.src = ZXING_URL;
+    s.onload = function(){ if(window.ZXing){ done(); } else { fail(); } };
+    s.onerror = function(){ fail(); };
+    document.head.appendChild(s);
+  }
+
+  function startScan(){
+    scanOverlay.className = "overlay show";
+    if(!hasCamera){
+      scanMsg.textContent = inLineApp
+        ? "แอป LINE บล็อกกล้อง กรุณากดเมนู ⋮ แล้วเลือก \"เปิดใน Chrome\""
+        : "เบราว์เซอร์นี้ไม่อนุญาตให้ใช้กล้อง (ต้องเปิดผ่านลิงก์ https:// ด้วย Chrome)";
+      return;
+    }
+    scanMsg.textContent = "กำลังเปิดกล้อง...";
+
+    if(hasNativeDetector){
+      openStream(function(stream){
+        scanStream = stream;
+        scanVideo.srcObject = stream;
+        try { scanVideo.setAttribute("playsinline", "true"); scanVideo.play(); } catch(e){}
+        scanMsg.textContent = "เล็งกล้องไปที่บาร์โค้ด / QR โค้ด";
+        var detector;
+        try { detector = new window.BarcodeDetector(); }
+        catch(e){
+          scanMsg.textContent = "ไม่สามารถเปิดตัวสแกนได้ กรุณาพิมพ์หมายเลขเอง";
+          return;
+        }
+        scanTimer = setInterval(function(){
+          if(!scanVideo.videoWidth) return;
+          detector.detect(scanVideo).then(function(codes){
+            if(codes && codes.length > 0){ onScanned(codes[0].rawValue || ""); }
+          }).catch(function(){});
+        }, 350);
+      }, function(err){
+        scanMsg.textContent = cameraErrorMessage(err);
+      });
+      return;
+    }
+
+    // fallback: ZXing (optional, loaded on demand)
+    scanMsg.textContent = "กำลังโหลดตัวสแกนสำรอง...";
+    loadZxing(function(){
+      try {
+        zxingReader = new window.ZXing.BrowserMultiFormatReader();
+        scanMsg.textContent = "เล็งกล้องไปที่บาร์โค้ด / QR โค้ด";
+        zxingReader.decodeFromVideoDevice(undefined, "scanVideo", function(result){
+          if(result){ onScanned(result.getText ? result.getText() : String(result.text || "")); }
+        }).catch(function(err){
+          scanMsg.textContent = cameraErrorMessage(err);
+        });
+      } catch(e){
+        scanMsg.textContent = cameraErrorMessage(e);
+      }
+    }, function(){
+      scanMsg.textContent = "โหลดตัวสแกนสำรองไม่ได้ (ต้องใช้อินเทอร์เน็ต) กรุณาพิมพ์หมายเลขเอง";
+    });
+  }
+
+  function stopScan(){
+    if(scanTimer){ clearInterval(scanTimer); scanTimer = null; }
+    if(zxingReader){ try { zxingReader.reset(); } catch(e){} zxingReader = null; }
+    if(scanStream){
+      var tracks = scanStream.getTracks();
+      for(var i=0;i<tracks.length;i++){ tracks[i].stop(); }
+      scanStream = null;
+    }
+    try { scanVideo.srcObject = null; } catch(e){}
+    scanOverlay.className = "overlay";
+  }
+
+  // ---------- form save / clear ----------
+  var editingNotice = document.getElementById("editingNotice");
+
+  // ---------- live duplicate S/N check ----------
+  var fSnInput = document.getElementById("fSn");
+  var dupSnHint = document.getElementById("dupSnHint");
+
+  function checkDupSnLive(){
+    var dup = findDuplicateSn(fSnInput.value, editingId);
+    if(dup){
+      dupSnHint.textContent = "⚠ หมายเลขนี้มีอยู่แล้วในระบบ (รายการ: " + dup.name + ") จะไม่สามารถบันทึกซ้ำได้";
+      dupSnHint.style.display = "block";
+    } else {
+      dupSnHint.style.display = "none";
+      dupSnHint.textContent = "";
+    }
+  }
+
+  fSnInput.addEventListener("input", checkDupSnLive);
+
+  document.getElementById("btnSaveItem").addEventListener("click", function(){
+    var recordDate = document.getElementById("fDate").value;
+    var recordedBy = document.getElementById("fRecordedBy").value.replace(/^\s+|\s+$/g, "");
+    var sn = document.getElementById("fSn").value.replace(/^\s+|\s+$/g, "");
+    var name = document.getElementById("fName").value.replace(/^\s+|\s+$/g, "");
+    var qtyRaw = document.getElementById("fQty").value;
+    var qty = parseInt(qtyRaw, 10);
+    var location = document.getElementById("fLocation").value.replace(/^\s+|\s+$/g, "");
+    var branch = document.getElementById("fBranch").value.replace(/^\s+|\s+$/g, "");
+    var note = document.getElementById("fNote").value.replace(/^\s+|\s+$/g, "");
+
+    if(!recordDate){ showToast("กรุณาเลือกวันที่บันทึก"); return; }
+    if(!recordedBy){ showToast("กรุณากรอกชื่อผู้บันทึก"); return; }
+    if(!sn){ showToast("กรุณากรอกหมายเลข S/N หรือหมายเลขทรัพย์สิน"); return; }
+    if(!name){ showToast("กรุณากรอกชื่อทรัพย์สิน"); return; }
+    if(!qty || qty < 1){ showToast("กรุณากรอกจำนวนให้ถูกต้อง"); return; }
+
+    var dup = findDuplicateSn(sn, editingId);
+    if(dup){
+      showToast("ไม่สามารถบันทึกได้: หมายเลข S/N นี้มีอยู่แล้วในระบบ (รายการ: " + dup.name + ")");
+      return;
+    }
+
+    try { window.localStorage.setItem(LAST_RECORDER_KEY, recordedBy); } catch(e){ /* ignore */ }
+
+    var record = {
+      id: editingId || genId(),
+      recordDate: recordDate,
+      recordedBy: recordedBy,
+      sn: sn,
+      name: name,
+      qty: qty,
+      location: location,
+      branch: branch,
+      note: note,
+      photo: currentPhotoData,
+      updatedAt: new Date().toISOString()
+    };
+
+    if(editingId){
+      for(var i=0;i<items.length;i++){
+        if(items[i].id === editingId){
+          record.createdAt = items[i].createdAt;
+          items[i] = record;
+          break;
+        }
+      }
+      showToast("อัปเดตรายการเรียบร้อย");
+    } else {
+      record.createdAt = record.updatedAt;
+      items.push(record);
+      showToast("บันทึกรายการเรียบร้อย");
+    }
+
+    saveItems();
+    clearForm();
+    renderSummary();
+  });
+
+  document.getElementById("btnClearForm").addEventListener("click", function(){
+    clearForm();
+  });
+
+  function clearForm(){
+    prefillMetaFields();
+    document.getElementById("fSn").value = "";
+    document.getElementById("fName").value = "";
+    document.getElementById("fQty").value = "1";
+    document.getElementById("fLocation").value = "";
+    document.getElementById("fBranch").value = "";
+    document.getElementById("fNote").value = "";
+    currentPhotoData = null;
+    renderPhotoPreview();
+    editingId = null;
+    editingNotice.style.display = "none";
+    dupSnHint.style.display = "none";
+  }
+
+  // ---------- list rendering ----------
+  var listContainer = document.getElementById("listContainer");
+  var searchBox = document.getElementById("searchBox");
+
+  searchBox.addEventListener("input", function(){ renderList(); });
+
+  function renderList(){
+    var q = searchBox.value.replace(/^\s+|\s+$/g, "").toLowerCase();
+    var filtered = items;
+    if(q){
+      filtered = [];
+      for(var i=0;i<items.length;i++){
+        var it = items[i];
+        var hay = ((it.name||"") + " " + (it.sn||"") + " " + (it.branch||"") + " " + (it.location||"") + " " + (it.recordedBy||"")).toLowerCase();
+        if(hay.indexOf(q) !== -1){ filtered.push(it); }
+      }
+    }
+
+    if(filtered.length === 0){
+      listContainer.innerHTML = "";
+      var empty = document.createElement("div");
+      empty.className = "empty-state";
+      empty.textContent = items.length === 0 ? "ยังไม่มีรายการทรัพย์สิน กดแท็บ \"เพิ่มรายการ\" เพื่อเริ่มบันทึก" : "ไม่พบรายการที่ค้นหา";
+      listContainer.appendChild(empty);
+      return;
+    }
+
+    var sorted = filtered.slice().sort(function(a,b){
+      return (b.updatedAt||"").localeCompare(a.updatedAt||"");
+    });
+
+    var html = "";
+    for(var j=0;j<sorted.length;j++){
+      var d = sorted[j];
+      html += buildCardHtml(d);
+    }
+    listContainer.innerHTML = html;
+
+    // wire up buttons
+    var editBtns = listContainer.querySelectorAll(".btn-edit");
+    for(var e=0;e<editBtns.length;e++){
+      editBtns[e].addEventListener("click", function(ev){
+        editItem(ev.currentTarget.getAttribute("data-id"));
+      });
+    }
+    var delBtns = listContainer.querySelectorAll(".btn-del");
+    for(var dbtn=0; dbtn<delBtns.length; dbtn++){
+      delBtns[dbtn].addEventListener("click", function(ev){
+        deleteItem(ev.currentTarget.getAttribute("data-id"));
+      });
+    }
+    var thumbs = listContainer.querySelectorAll(".thumb");
+    for(var th=0; th<thumbs.length; th++){
+      thumbs[th].addEventListener("click", function(ev){
+        openPhotoView(ev.currentTarget.getAttribute("data-src"));
+      });
+    }
+  }
+
+  function escapeHtml(s){
+    if(s === null || s === undefined) return "";
+    return String(s)
+      .replace(/&/g,"&amp;")
+      .replace(/</g,"&lt;")
+      .replace(/>/g,"&gt;")
+      .replace(/"/g,"&quot;");
+  }
+
+  function buildCardHtml(d){
+    var thumbHtml;
+    if(d.photo){
+      thumbHtml = '<img class="thumb" data-src="' + escapeHtml(d.photo) + '" src="' + escapeHtml(d.photo) + '">';
+    } else {
+      thumbHtml = '<div class="thumb-empty">ไม่มีรูป</div>';
+    }
+    var metaParts = [];
+    if(d.location){ metaParts.push('สถานที่: <b>' + escapeHtml(d.location) + '</b>'); }
+    if(d.branch){ metaParts.push('สาขา: <b>' + escapeHtml(d.branch) + '</b>'); }
+    var metaHtml = metaParts.length ? '<div class="meta">' + metaParts.join(' &nbsp;·&nbsp; ') + '</div>' : '';
+    var recordMetaParts = [];
+    if(d.recordDate){ recordMetaParts.push('วันที่: <b>' + escapeHtml(d.recordDate) + '</b>'); }
+    if(d.recordedBy){ recordMetaParts.push('บันทึกโดย: <b>' + escapeHtml(d.recordedBy) + '</b>'); }
+    var recordMetaHtml = recordMetaParts.length ? '<div class="meta">' + recordMetaParts.join(' &nbsp;·&nbsp; ') + '</div>' : '';
+    var noteHtml = d.note ? '<div class="note">หมายเหตุ: ' + escapeHtml(d.note) + '</div>' : '';
+
+    return (
+      '<div class="item-card">' +
+        thumbHtml +
+        '<div class="body">' +
+          '<div class="name">' + escapeHtml(d.name) + '</div>' +
+          '<span class="sn">' + escapeHtml(d.sn) + '</span>' +
+          '<div class="meta">จำนวน: <b>' + escapeHtml(d.qty) + '</b></div>' +
+          metaHtml +
+          recordMetaHtml +
+          noteHtml +
+          '<div class="row-actions">' +
+            '<button type="button" class="btn btn-outline btn-sm btn-edit" data-id="' + escapeHtml(d.id) + '">แก้ไข</button>' +
+            '<button type="button" class="btn btn-danger btn-sm btn-del" data-id="' + escapeHtml(d.id) + '">ลบ</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  function editItem(id){
+    var found = null;
+    for(var i=0;i<items.length;i++){ if(items[i].id === id){ found = items[i]; break; } }
+    if(!found) return;
+    editingId = id;
+    document.getElementById("fDate").value = found.recordDate || todayStr();
+    document.getElementById("fRecordedBy").value = found.recordedBy || "";
+    document.getElementById("fSn").value = found.sn || "";
+    document.getElementById("fName").value = found.name || "";
+    document.getElementById("fQty").value = found.qty || 1;
+    document.getElementById("fLocation").value = found.location || "";
+    document.getElementById("fBranch").value = found.branch || "";
+    document.getElementById("fNote").value = found.note || "";
+    currentPhotoData = found.photo || null;
+    renderPhotoPreview();
+    checkDupSnLive();
+    editingNotice.style.display = "block";
+    showPanel("add");
+    window.scrollTo(0,0);
+  }
+
+  function deleteItem(id){
+    if(!window.confirm("ยืนยันการลบรายการนี้ออกจากทะเบียน?")) return;
+    var next = [];
+    for(var i=0;i<items.length;i++){ if(items[i].id !== id){ next.push(items[i]); } }
+    items = next;
+    saveItems();
+    renderList();
+    renderSummary();
+    showToast("ลบรายการแล้ว");
+  }
+
+  // ---------- photo view ----------
+  var photoView = document.getElementById("photoView");
+  var photoViewImg = document.getElementById("photoViewImg");
+  document.getElementById("btnClosePhotoView").addEventListener("click", function(){
+    photoView.className = "photo-view";
+  });
+  function openPhotoView(src){
+    photoViewImg.src = src;
+    photoView.className = "photo-view show";
+  }
+
+  // ---------- summary ----------
+  function renderSummary(){
+    var totalQty = 0;
+    var branchSet = {};
+    for(var i=0;i<items.length;i++){
+      totalQty += (parseInt(items[i].qty,10) || 0);
+      if(items[i].branch){ branchSet[items[i].branch] = true; }
+    }
+    var branchCount = 0;
+    for(var k in branchSet){ if(branchSet.hasOwnProperty(k)){ branchCount++; } }
+    document.getElementById("sumCount").textContent = items.length;
+    document.getElementById("sumQty").textContent = totalQty;
+    document.getElementById("sumBranch").textContent = branchCount;
+  }
+
+  // ---------- minimal zip writer (store method, no external library) ----------
+  var _crc32Table = null;
+  function crc32(bytes){
+    if(!_crc32Table){
+      _crc32Table = [];
+      for(var n=0;n<256;n++){
+        var c = n;
+        for(var k=0;k<8;k++){
+          c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+        }
+        _crc32Table[n] = c >>> 0;
+      }
+    }
+    var crc = 0xFFFFFFFF;
+    for(var i=0;i<bytes.length;i++){
+      crc = (crc >>> 8) ^ _crc32Table[(crc ^ bytes[i]) & 0xFF];
+    }
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+  }
+
+  function u16le(n){ return [n & 0xFF, (n >>> 8) & 0xFF]; }
+  function u32le(n){ return [n & 0xFF, (n >>> 8) & 0xFF, (n >>> 16) & 0xFF, (n >>> 24) & 0xFF]; }
+
+  function strToBytes(str){
+    if(window.TextEncoder){ return new window.TextEncoder().encode(str); }
+    var bytes = [];
+    for(var i=0;i<str.length;i++){
+      var code = str.charCodeAt(i);
+      if(code < 0x80){ bytes.push(code); }
+      else if(code < 0x800){
+        bytes.push(0xC0 | (code >> 6));
+        bytes.push(0x80 | (code & 0x3F));
+      } else {
+        bytes.push(0xE0 | (code >> 12));
+        bytes.push(0x80 | ((code >> 6) & 0x3F));
+        bytes.push(0x80 | (code & 0x3F));
+      }
+    }
+    return new Uint8Array(bytes);
+  }
+
+  function sanitizeFilename(s){
+    s = String(s || "item").replace(/[^A-Za-z0-9\-_]+/g, "_").replace(/^_+|_+$/g, "");
+    return s || "item";
+  }
+
+  function pad3(n){
+    n = String(n);
+    while(n.length < 3){ n = "0" + n; }
+    return n;
+  }
+
+  function dataUrlToBytes(dataUrl){
+    var base64 = dataUrl.split(",")[1] || "";
+    var binary = window.atob(base64);
+    var len = binary.length;
+    var bytes = new Uint8Array(len);
+    for(var i=0;i<len;i++){ bytes[i] = binary.charCodeAt(i); }
+    return bytes;
+  }
+
+  // files: array of { name: string (ASCII-safe), data: Uint8Array }
+  function buildZip(files){
+    var localParts = [];
+    var centralParts = [];
+    var offset = 0;
+
+    for(var i=0;i<files.length;i++){
+      var f = files[i];
+      var nameBytes = strToBytes(f.name);
+      var crc = crc32(f.data);
+      var size = f.data.length;
+
+      var localArr = [].concat(
+        u32le(0x04034b50), u16le(20), u16le(0), u16le(0), u16le(0), u16le(0),
+        u32le(crc), u32le(size), u32le(size),
+        u16le(nameBytes.length), u16le(0)
+      );
+      var localHeaderBytes = new Uint8Array(localArr.length + nameBytes.length);
+      localHeaderBytes.set(localArr, 0);
+      localHeaderBytes.set(nameBytes, localArr.length);
+      localParts.push(localHeaderBytes);
+      localParts.push(f.data);
+
+      var centralArr = [].concat(
+        u32le(0x02014b50), u16le(20), u16le(20), u16le(0), u16le(0), u16le(0), u16le(0),
+        u32le(crc), u32le(size), u32le(size),
+        u16le(nameBytes.length), u16le(0), u16le(0), u16le(0), u16le(0), u32le(0), u32le(offset)
+      );
+      var centralHeaderBytes = new Uint8Array(centralArr.length + nameBytes.length);
+      centralHeaderBytes.set(centralArr, 0);
+      centralHeaderBytes.set(nameBytes, centralArr.length);
+      centralParts.push(centralHeaderBytes);
+
+      offset += localHeaderBytes.length + f.data.length;
+    }
+
+    var centralSize = 0;
+    for(var j=0;j<centralParts.length;j++){ centralSize += centralParts[j].length; }
+    var centralOffset = offset;
+
+    var eocdArr = [].concat(
+      u32le(0x06054b50), u16le(0), u16le(0),
+      u16le(files.length), u16le(files.length),
+      u32le(centralSize), u32le(centralOffset), u16le(0)
+    );
+    var eocdBytes = new Uint8Array(eocdArr);
+
+    var totalLength = offset + centralSize + eocdBytes.length;
+    var result = new Uint8Array(totalLength);
+    var pos = 0;
+    function write(arr){ result.set(arr, pos); pos += arr.length; }
+    for(var k=0;k<localParts.length;k++){ write(localParts[k]); }
+    for(var m=0;m<centralParts.length;m++){ write(centralParts[m]); }
+    write(eocdBytes);
+    return result;
+  }
+
+  // ---------- export CSV ----------
+  document.getElementById("btnExportCsv").addEventListener("click", function(){
+    if(items.length === 0){ showToast("ยังไม่มีข้อมูลให้ส่งออก"); return; }
+    var headers = ["วันที่บันทึก","ผู้บันทึก","S/N หรือหมายเลขทรัพย์สิน","ชื่อทรัพย์สิน","จำนวน","สถานที่จัดเก็บ","สาขาที่นำเข้าโกดัง","หมายเหตุ","เวลาที่บันทึกในระบบ"];
+    var rows = [headers];
+    for(var i=0;i<items.length;i++){
+      var d = items[i];
+      rows.push([d.recordDate||"", d.recordedBy||"", d.sn, d.name, d.qty, d.location||"", d.branch||"", d.note||"", (d.createdAt||"").substring(0,19).replace("T"," ")]);
+    }
+    var csv = rows.map(function(row){
+      return row.map(function(cell){
+        var v = String(cell === undefined || cell === null ? "" : cell);
+        v = v.replace(/"/g, '""');
+        return '"' + v + '"';
+      }).join(",");
+    }).join("\r\n");
+
+    var bom = "\uFEFF";
+    downloadBlob(bom + csv, "text/csv;charset=utf-8", "ทะเบียนทรัพย์สิน_" + dateStamp() + ".csv");
+  });
+
+  // ---------- export CSV + photos as ZIP ----------
+  document.getElementById("btnExportCsvZip").addEventListener("click", function(){
+    if(items.length === 0){ showToast("ยังไม่มีข้อมูลให้ส่งออก"); return; }
+    showToast("กำลังเตรียมไฟล์ ZIP ...");
+    setTimeout(function(){
+      try {
+        var headers = ["ลำดับ","วันที่บันทึก","ผู้บันทึก","S/N หรือหมายเลขทรัพย์สิน","ชื่อทรัพย์สิน","จำนวน","สถานที่จัดเก็บ","สาขาที่นำเข้าโกดัง","หมายเหตุ","ไฟล์รูปภาพ","เวลาที่บันทึกในระบบ"];
+        var rows = [headers];
+        var files = [];
+
+        for(var i=0;i<items.length;i++){
+          var d = items[i];
+          var seq = i + 1;
+          var photoRef = "";
+          if(d.photo){
+            var safeSn = sanitizeFilename(d.sn);
+            photoRef = "photos/" + pad3(seq) + "_" + safeSn + ".jpg";
+            files.push({ name: photoRef, data: dataUrlToBytes(d.photo) });
+          }
+          rows.push([
+            seq, d.recordDate||"", d.recordedBy||"", d.sn, d.name, d.qty,
+            d.location||"", d.branch||"", d.note||"", photoRef,
+            (d.createdAt||"").substring(0,19).replace("T"," ")
+          ]);
+        }
+
+        var csv = rows.map(function(row){
+          return row.map(function(cell){
+            var v = String(cell === undefined || cell === null ? "" : cell);
+            v = v.replace(/"/g, '""');
+            return '"' + v + '"';
+          }).join(",");
+        }).join("\r\n");
+
+        var csvBytes = strToBytes("\uFEFF" + csv);
+        files.unshift({ name: "asset_registry.csv", data: csvBytes });
+
+        var zipBytes = buildZip(files);
+        var blob = new Blob([zipBytes], { type: "application/zip" });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = "ทะเบียนทรัพย์สิน_พร้อมรูป_" + dateStamp() + ".zip";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function(){ URL.revokeObjectURL(url); }, 3000);
+        showToast("สร้างไฟล์ ZIP สำเร็จ (" + files.length + " ไฟล์)");
+      } catch(err){
+        showToast("สร้างไฟล์ ZIP ไม่สำเร็จ กรุณาลองใหม่ หรือส่งออกเป็น CSV/JSON แทน");
+      }
+    }, 30);
+  });
+
+  // ---------- export JSON ----------
+  document.getElementById("btnExportJson").addEventListener("click", function(){
+    if(items.length === 0){ showToast("ยังไม่มีข้อมูลให้ส่งออก"); return; }
+    var payload = JSON.stringify({ exportedAt: new Date().toISOString(), items: items }, null, 0);
+    downloadBlob(payload, "application/json;charset=utf-8", "ทะเบียนทรัพย์สิน_สำรอง_" + dateStamp() + ".json");
+  });
+
+  function dateStamp(){
+    var n = new Date();
+    function pad(x){ return x < 10 ? "0" + x : "" + x; }
+    return n.getFullYear() + pad(n.getMonth()+1) + pad(n.getDate()) + "_" + pad(n.getHours()) + pad(n.getMinutes());
+  }
+
+  function downloadBlob(content, mime, filename){
+    try {
+      var blob = new Blob([content], { type: mime });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 3000);
+    } catch(e){
+      showToast("ไม่สามารถสร้างไฟล์ดาวน์โหลดได้ในเบราว์เซอร์นี้");
+    }
+  }
+
+  // ---------- import JSON ----------
+  var importFileInput = document.getElementById("importFileInput");
+  document.getElementById("btnImportJson").addEventListener("click", function(){
+    importFileInput.click();
+  });
+  importFileInput.addEventListener("change", function(ev){
+    var file = ev.target.files && ev.target.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(e){
+      var parsed;
+      try { parsed = JSON.parse(e.target.result); }
+      catch(err){ showToast("ไฟล์นี้ไม่ใช่ไฟล์สำรองที่ถูกต้อง"); return; }
+      var incoming = parsed && parsed.items ? parsed.items : (Array.isArray(parsed) ? parsed : null);
+      if(!incoming){ showToast("ไม่พบข้อมูลรายการในไฟล์นี้"); return; }
+
+      var existingIds = {};
+      for(var i=0;i<items.length;i++){ existingIds[items[i].id] = true; }
+      var added = 0;
+      for(var j=0;j<incoming.length;j++){
+        var rec = incoming[j];
+        if(!rec || !rec.id){ continue; }
+        if(existingIds[rec.id]){ continue; }
+        items.push(rec);
+        added++;
+      }
+      saveItems();
+      renderSummary();
+      renderList();
+      showToast("นำเข้าสำเร็จ: เพิ่ม " + added + " รายการใหม่");
+    };
+    reader.onerror = function(){ showToast("ไม่สามารถอ่านไฟล์นี้ได้"); };
+    reader.readAsText(file);
+    importFileInput.value = "";
+  });
+
+  // ---------- clear all ----------
+  document.getElementById("btnClearAll").addEventListener("click", function(){
+    if(items.length === 0){ showToast("ไม่มีข้อมูลให้ลบ"); return; }
+    if(!window.confirm("ยืนยันการลบข้อมูลทั้งหมด " + items.length + " รายการออกจากเครื่องนี้? การกระทำนี้ย้อนกลับไม่ได้")) return;
+    items = [];
+    saveItems();
+    renderSummary();
+    renderList();
+    showToast("ลบข้อมูลทั้งหมดแล้ว");
+  });
+
+  // ---------- init ----------
+  loadItems();
+  renderSummary();
+  renderPhotoPreview();
+  prefillMetaFields();
+
+})();
+</script>
+</body>
+</html>
