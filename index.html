@@ -104,7 +104,6 @@
   textarea{min-height:70px; resize:vertical;}
   .sn-row{display:flex; gap:8px;}
   .sn-row input{flex:1; font-family:var(--mono);}
-  .sn-row textarea{flex:1;}
   .two-col{display:flex; gap:10px;}
   .two-col > div{flex:1;}
   .btn{
@@ -175,7 +174,7 @@
     font-size:10px; color:var(--muted); text-align:center;
   }
   .item-card .body{flex:1; min-width:0;}
-  .item-card .name{font-weight:700; font-size:15px; white-space:pre-line; word-break:break-word;}
+  .item-card .name{font-weight:700; font-size:15px;}
   .item-card .sn{
     font-family:var(--mono); font-size:12.5px; color:var(--accent-dark);
     background:#FBEADF; display:inline-block; padding:1px 6px; border-radius:4px; margin-top:3px;
@@ -296,7 +295,7 @@
 
     <label>ชื่อทรัพย์สิน <span class="req">*</span></label>
     <div class="sn-row">
-      <textarea id="fName" rows="2" placeholder="พิมพ์ หรือ สแกนข้อความ (OCR) — คงรูปแบบตัวอักษรและการขึ้นบรรทัดตามต้นฉบับ" style="font-family:var(--sans); min-height:58px;"></textarea>
+      <input type="text" id="fName" placeholder="พิมพ์ หรือ สแกนบาร์โค้ด/QR" style="font-family:var(--sans);">
       <button type="button" class="btn btn-outline" id="btnScanName">▦ สแกน</button>
     </div>
 
@@ -384,18 +383,6 @@
   <div style="font-weight:700; font-size:16px; margin-bottom:6px;">อ่านข้อมูลจากรูป</div>
   <div class="hint" id="ocrStatus"></div>
   <img id="ocrImg" alt="" style="display:none; max-width:100%; max-height:170px; border-radius:8px; margin:8px 0; align-self:flex-start;">
-  <div id="ocrEditBox" style="display:none;">
-    <label style="margin-top:8px;">ข้อความที่อ่านได้ (แก้ไขให้ตรงกับรูปได้)</label>
-    <textarea id="ocrText" style="min-height:90px;"></textarea>
-    <button type="button" class="btn btn-primary btn-block" id="btnOcrUse" style="margin-top:8px;">✓ ใช้ข้อความนี้ในช่อง</button>
-    <div class="hint" style="margin-top:10px;">อ่านไม่ตรง? ลองอ่านใหม่ด้วยโหมดอื่น:</div>
-    <div class="photo-actions">
-      <button type="button" class="btn btn-outline btn-sm" data-psm="6">กลุ่มข้อความ</button>
-      <button type="button" class="btn btn-outline btn-sm" data-psm="7">บรรทัดเดียว</button>
-      <button type="button" class="btn btn-outline btn-sm" data-psm="11">ข้อความกระจาย</button>
-    </div>
-  </div>
-  <div class="hint" style="margin-top:10px;">หรือแตะบรรทัดด้านล่างเพื่อใช้ทีละบรรทัด:</div>
   <div id="ocrLines"></div>
   <div class="form-actions">
     <button type="button" class="btn btn-outline btn-block" id="btnOcrRetake">📷 ถ่ายใหม่</button>
@@ -584,9 +571,8 @@
   var scanMsg = document.getElementById("scanMsg");
   var btnScan = document.getElementById("btnScan");
   var scanHint = document.getElementById("scanHint");
-  var zxingControls = null;
-  var zxingWanted = false;
-  var ZXING_URL = "https://unpkg.com/@zxing/browser@0.1.5";
+  var zxingReader = null;
+  var ZXING_URL = "https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js";
 
   var hasNativeDetector = ("BarcodeDetector" in window);
   var hasCamera = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
@@ -603,18 +589,15 @@
   }
 
   var scanTargetId = "fSn";
-  var ocrOnly = false;
 
   btnScan.addEventListener("click", function(){
     scanTargetId = "fSn";
-    ocrOnly = false;
     startScan();
   });
 
   document.getElementById("btnScanName").addEventListener("click", function(){
     scanTargetId = "fName";
-    ocrOnly = true;
-    scanPhotoInput.click();
+    startScan();
   });
 
   document.getElementById("btnCancelScan").addEventListener("click", function(){
@@ -666,7 +649,7 @@
     s.onerror = function(){ fail(); };
     document.head.appendChild(s);
   }
-  function loadZxing(done, fail){ loadScriptOnce(ZXING_URL, "ZXingBrowser", done, fail); }
+  function loadZxing(done, fail){ loadScriptOnce(ZXING_URL, "ZXing", done, fail); }
   var TESSERACT_URL = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
   function loadTesseract(done, fail){ loadScriptOnce(TESSERACT_URL, "Tesseract", done, fail); }
 
@@ -704,23 +687,14 @@
       return;
     }
 
-    // fallback: ZXing browser (optional, loaded on demand)
+    // fallback: ZXing (optional, loaded on demand)
     scanMsg.textContent = "กำลังโหลดตัวสแกนสำรอง...";
-    zxingWanted = true;
     loadZxing(function(){
-      if(!zxingWanted){ return; }
       try {
-        var reader = new window.ZXingBrowser.BrowserMultiFormatReader();
+        zxingReader = new window.ZXing.BrowserMultiFormatReader();
         scanMsg.textContent = "เล็งกล้องไปที่บาร์โค้ด / QR โค้ด — สแกนไม่ติด? กดปุ่มถ่ายรูปด้านล่าง";
-        reader.decodeFromConstraints(
-          { video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } }, audio: false },
-          scanVideo,
-          function(result){
-            if(result && zxingWanted){ onScanned(result.getText ? result.getText() : String(result.text || "")); }
-          }
-        ).then(function(controls){
-          if(!zxingWanted){ try { controls.stop(); } catch(e){} }
-          else { zxingControls = controls; }
+        zxingReader.decodeFromVideoDevice(undefined, "scanVideo", function(result){
+          if(result){ onScanned(result.getText ? result.getText() : String(result.text || "")); }
         }).catch(function(err){
           scanMsg.textContent = cameraErrorMessage(err);
         });
@@ -728,14 +702,13 @@
         scanMsg.textContent = cameraErrorMessage(e);
       }
     }, function(){
-      scanMsg.textContent = "โหลดตัวสแกนสำรองไม่ได้ (ต้องใช้อินเทอร์เน็ต) กรุณาพิมพ์หมายเลขเอง หรือกดถ่ายรูปแล้วอ่านข้อมูล";
+      scanMsg.textContent = "โหลดตัวสแกนสำรองไม่ได้ (ต้องใช้อินเทอร์เน็ต) กรุณาพิมพ์หมายเลขเอง";
     });
   }
 
   function stopScan(){
     if(scanTimer){ clearInterval(scanTimer); scanTimer = null; }
-    zxingWanted = false;
-    if(zxingControls){ try { zxingControls.stop(); } catch(e){} zxingControls = null; }
+    if(zxingReader){ try { zxingReader.reset(); } catch(e){} zxingReader = null; }
     if(scanStream){
       var tracks = scanStream.getTracks();
       for(var i=0;i<tracks.length;i++){ tracks[i].stop(); }
@@ -792,7 +765,6 @@
         var dataUrl = canvas.toDataURL("image/jpeg", 0.85);
         ocrImg.src = dataUrl; ocrImg.style.display = "block";
         ocrStatus.textContent = "กำลังหาบาร์โค้ด/QR ในรูป...";
-        if(ocrOnly){ runOcr(canvas); return; }
         decodeBarcodeFromCanvas(canvas, dataUrl, function(value){
           if(value){ applyScannedValue(value, false); }
           else { runOcr(canvas); }
@@ -805,148 +777,40 @@
     reader.readAsDataURL(file);
   }
 
-  function rotateCanvas90(src){
-    var c = document.createElement("canvas");
-    c.width = src.height; c.height = src.width;
-    var ctx = c.getContext("2d");
-    ctx.translate(c.width, 0);
-    ctx.rotate(Math.PI / 2);
-    ctx.drawImage(src, 0, 0);
-    return c;
-  }
-
-  // try one canvas with native detector or ZXing; cb(value|null)
-  function decodeOneCanvas(cv, cb){
+  function decodeBarcodeFromCanvas(canvas, dataUrl, cb){
     if(hasNativeDetector){
       try {
-        new window.BarcodeDetector().detect(cv).then(function(codes){
-          cb(codes && codes.length ? (codes[0].rawValue || null) : null);
+        new window.BarcodeDetector().detect(canvas).then(function(codes){
+          cb(codes && codes.length ? (codes[0].rawValue || "") : null);
         }).catch(function(){ cb(null); });
       } catch(e){ cb(null); }
       return;
     }
-    try {
-      var r = new window.ZXingBrowser.BrowserMultiFormatReader();
-      r.decodeFromCanvas(cv).then(function(res){
-        cb(res && res.getText ? res.getText() : null);
-      }).catch(function(){ cb(null); });
-    } catch(e){ cb(null); }
+    loadZxing(function(){
+      try {
+        var r = new window.ZXing.BrowserMultiFormatReader();
+        r.decodeFromImageUrl(dataUrl).then(function(res){
+          cb(res && res.getText ? res.getText() : null);
+        }).catch(function(){ cb(null); });
+      } catch(e){ cb(null); }
+    }, function(){ cb(null); });
   }
 
-  // try several versions of the photo: original, enhanced, rotated 90 degrees
-  function decodeBarcodeFromCanvas(canvas, dataUrl, cb){
-    function go(){
-      var enhanced = preprocessForOcr(canvas);
-      var attempts = [canvas, enhanced, rotateCanvas90(canvas), rotateCanvas90(enhanced)];
-      var idx = 0;
-      function next(){
-        if(idx >= attempts.length){ cb(null); return; }
-        var cv = attempts[idx++];
-        decodeOneCanvas(cv, function(v){
-          if(v){ cb(v); } else { next(); }
-        });
-      }
-      next();
-    }
-    if(hasNativeDetector){ go(); return; }
-    loadZxing(go, function(){ cb(null); });
-  }
-
-  var ocrWorker = null;
-  var lastOcrCanvas = null;
-
-  // grayscale + contrast stretch (+ upscale small images) to help OCR
-  function preprocessForOcr(src){
-    var scale = 1;
-    var longSide = Math.max(src.width, src.height);
-    if(longSide < 1600){ scale = Math.min(2, 1600 / longSide); }
-    var w = Math.round(src.width * scale), h2 = Math.round(src.height * scale);
-    var c = document.createElement("canvas");
-    c.width = w; c.height = h2;
-    var ctx = c.getContext("2d");
-    ctx.drawImage(src, 0, 0, w, h2);
-    var img = ctx.getImageData(0, 0, w, h2);
-    var d = img.data, hist = [], i;
-    for(i=0;i<256;i++){ hist[i] = 0; }
-    for(i=0;i<d.length;i+=4){
-      var g = Math.round(0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2]);
-      d[i] = d[i+1] = d[i+2] = g;
-      hist[g]++;
-    }
-    var total = w * h2, acc = 0, lo = 0, hi = 255;
-    for(i=0;i<256;i++){ acc += hist[i]; if(acc > total*0.02){ lo = i; break; } }
-    acc = 0;
-    for(i=255;i>=0;i--){ acc += hist[i]; if(acc > total*0.02){ hi = i; break; } }
-    if(hi - lo < 20){ lo = 0; hi = 255; }
-    var range = hi - lo;
-    for(i=0;i<d.length;i+=4){
-      var v = Math.round((d[i] - lo) * 255 / range);
-      v = v < 0 ? 0 : (v > 255 ? 255 : v);
-      d[i] = d[i+1] = d[i+2] = v;
-    }
-    ctx.putImageData(img, 0, 0);
-    return c;
-  }
-
-  // Tesseract puts spurious spaces between Thai characters; remove them
-  function cleanOcrText(t){
-    t = String(t || "").replace(/\r/g, "");
-    t = t.replace(/([\u0E00-\u0E7F])[ \t]+(?=[\u0E00-\u0E7F])/g, "$1");
-    t = t.replace(/[ \t]+\n/g, "\n");
-    return t.replace(/^\s+|\s+$/g, "");
-  }
-
-  function getOcrWorker(done, fail){
-    if(ocrWorker){ done(ocrWorker); return; }
-    window.Tesseract.createWorker("tha+eng", 1, {
-      logger: function(m){
-        if(m && m.status === "recognizing text"){
-          ocrStatus.textContent = "กำลังอ่านข้อความจากรูป... " + Math.round((m.progress || 0) * 100) + "%";
-        } else if(m && m.status){
-          ocrStatus.textContent = "กำลังเตรียมตัวอ่านข้อความ (" + m.status + ")... ครั้งแรกอาจใช้เวลา 10-40 วินาที";
-        }
-      }
-    }).then(function(w){ ocrWorker = w; done(w); }).catch(fail);
-  }
-
-  function runOcr(canvas, psm){
-    lastOcrCanvas = canvas;
-    ocrLines.innerHTML = "";
-    document.getElementById("ocrEditBox").style.display = "none";
-    ocrStatus.textContent = (ocrOnly ? "" : "ไม่พบบาร์โค้ด ") + "กำลังเตรียมอ่านข้อความจากรูป (ต้องใช้อินเทอร์เน็ต ครั้งแรกอาจใช้เวลา 10-40 วินาที)...";
+  function runOcr(canvas){
+    ocrStatus.textContent = "ไม่พบบาร์โค้ด กำลังอ่านข้อความจากรูป (ครั้งแรกอาจใช้เวลา 10-40 วินาที และต้องใช้อินเทอร์เน็ต)...";
     loadTesseract(function(){
-      getOcrWorker(function(worker){
-        var mode = String(psm || "6");
-        worker.setParameters({ tessedit_pageseg_mode: mode, preserve_interword_spaces: "1" }).then(function(){
-          return worker.recognize(preprocessForOcr(canvas));
-        }).then(function(ret){
-          showOcrLines(cleanOcrText(ret && ret.data ? ret.data.text : ""));
-        }).catch(function(){
-          ocrStatus.textContent = "อ่านข้อความไม่สำเร็จ กรุณาลองอ่านใหม่ ถ่ายใหม่ หรือพิมพ์เอง";
+      window.Tesseract.createWorker("eng+tha").then(function(worker){
+        return worker.recognize(canvas).then(function(ret){
+          try { worker.terminate(); } catch(e){}
+          showOcrLines(ret && ret.data ? ret.data.text : "");
         });
-      }, function(){
+      }).catch(function(){
         ocrStatus.textContent = "อ่านข้อความไม่สำเร็จ (อาจไม่มีอินเทอร์เน็ต) กรุณาพิมพ์เอง หรือถ่ายใหม่";
       });
     }, function(){
       ocrStatus.textContent = "โหลดตัวอ่านข้อความไม่ได้ (ต้องใช้อินเทอร์เน็ต) กรุณาพิมพ์เอง";
     });
   }
-
-  document.getElementById("btnOcrUse").addEventListener("click", function(){
-    var t = document.getElementById("ocrText").value;
-    if(scanTargetId === "fSn"){ t = t.replace(/\s*\n+\s*/g, " "); }
-    if(!t.replace(/\s+/g, "")){ showToast("ยังไม่มีข้อความให้ใช้"); return; }
-    applyScannedValue(t, true);
-  });
-
-  (function(){
-    var btns = document.querySelectorAll("#ocrEditBox [data-psm]");
-    for(var i=0;i<btns.length;i++){
-      btns[i].addEventListener("click", function(ev){
-        if(lastOcrCanvas){ runOcr(lastOcrCanvas, ev.currentTarget.getAttribute("data-psm")); }
-      });
-    }
-  })();
 
   function showOcrLines(text){
     var raw = String(text || "").split(/\r?\n/);
@@ -957,13 +821,11 @@
       seen[t] = true; lines.push(t);
       if(lines.length >= 15) break;
     }
-    document.getElementById("ocrEditBox").style.display = "block";
-    document.getElementById("ocrText").value = String(text || "");
     if(!lines.length){
-      ocrStatus.textContent = "ไม่พบข้อความในรูป ลองอ่านใหม่ด้วยโหมดอื่น หรือถ่ายใหม่ให้ใกล้ ชัด และแสงสว่างพอ";
+      ocrStatus.textContent = "ไม่พบข้อความในรูป ลองถ่ายใหม่ให้ใกล้ ชัด และแสงสว่างพอ";
       return;
     }
-    ocrStatus.textContent = "อ่านเสร็จแล้ว ตรวจเทียบกับรูป แก้ไขในกล่องข้อความได้ แล้วกดใช้ข้อความ" + (scanTargetId === "fSn" ? " (ช่อง S/N จะตัดช่องว่างให้อัตโนมัติ)" : "");
+    ocrStatus.textContent = "แตะบรรทัดที่ต้องการเพื่อใส่ในช่อง" + (scanTargetId === "fSn" ? " (ระบบจะตัดช่องว่างให้อัตโนมัติ)" : "") + " — แก้ไขในฟอร์มได้ภายหลัง";
     ocrLines.innerHTML = "";
     for(var j=0;j<lines.length;j++){
       var b = document.createElement("button");
@@ -974,15 +836,6 @@
       b.setAttribute("data-v", lines[j]);
       b.addEventListener("click", function(ev){ applyScannedValue(ev.currentTarget.getAttribute("data-v"), true); });
       ocrLines.appendChild(b);
-    }
-    if(scanTargetId === "fName" && lines.length > 1){
-      var all = document.createElement("button");
-      all.type = "button";
-      all.className = "btn btn-primary btn-block";
-      all.style.cssText = "margin-bottom:6px;";
-      all.textContent = "ใช้ข้อความทั้งหมด (คงรูปแบบต้นฉบับ)";
-      all.addEventListener("click", function(){ applyScannedValue(String(text || ""), true); });
-      ocrLines.insertBefore(all, ocrLines.firstChild);
     }
   }
 
