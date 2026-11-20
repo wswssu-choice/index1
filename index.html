@@ -373,6 +373,20 @@
   <div class="overlay-msg" id="scanMsg">กำลังเปิดกล้อง...</div>
   <div class="overlay-bar">
     <button type="button" class="btn btn-outline" id="btnCancelScan" style="background:#333; color:#fff; border-color:#555;">ยกเลิก</button>
+    <button type="button" class="btn btn-primary" id="btnScanPhoto">📷 ถ่ายรูปแล้วอ่านข้อมูล</button>
+    <input type="file" accept="image/*" capture="environment" id="scanPhotoInput" style="display:none;">
+  </div>
+</div>
+
+<!-- OCR / PHOTO READ PANEL -->
+<div class="overlay" id="ocrPanel" style="background:#FAF7F2; color:#2B2B2B; overflow:auto; padding:16px; display:none;">
+  <div style="font-weight:700; font-size:16px; margin-bottom:6px;">อ่านข้อมูลจากรูป</div>
+  <div class="hint" id="ocrStatus"></div>
+  <img id="ocrImg" alt="" style="display:none; max-width:100%; max-height:170px; border-radius:8px; margin:8px 0; align-self:flex-start;">
+  <div id="ocrLines"></div>
+  <div class="form-actions">
+    <button type="button" class="btn btn-outline btn-block" id="btnOcrRetake">📷 ถ่ายใหม่</button>
+    <button type="button" class="btn btn-primary btn-block" id="btnOcrClose">ปิด</button>
   </div>
 </div>
 
@@ -627,14 +641,17 @@
       });
   }
 
-  function loadZxing(done, fail){
-    if(window.ZXing){ done(); return; }
+  function loadScriptOnce(url, globalName, done, fail){
+    if(window[globalName]){ done(); return; }
     var s = document.createElement("script");
-    s.src = ZXING_URL;
-    s.onload = function(){ if(window.ZXing){ done(); } else { fail(); } };
+    s.src = url;
+    s.onload = function(){ if(window[globalName]){ done(); } else { fail(); } };
     s.onerror = function(){ fail(); };
     document.head.appendChild(s);
   }
+  function loadZxing(done, fail){ loadScriptOnce(ZXING_URL, "ZXing", done, fail); }
+  var TESSERACT_URL = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
+  function loadTesseract(done, fail){ loadScriptOnce(TESSERACT_URL, "Tesseract", done, fail); }
 
   function startScan(){
     scanOverlay.className = "overlay show";
@@ -651,7 +668,7 @@
         scanStream = stream;
         scanVideo.srcObject = stream;
         try { scanVideo.setAttribute("playsinline", "true"); scanVideo.play(); } catch(e){}
-        scanMsg.textContent = "เล็งกล้องไปที่บาร์โค้ด / QR โค้ด";
+        scanMsg.textContent = "เล็งกล้องไปที่บาร์โค้ด / QR โค้ด — สแกนไม่ติด? กดปุ่มถ่ายรูปด้านล่าง";
         var detector;
         try { detector = new window.BarcodeDetector(); }
         catch(e){
@@ -675,7 +692,7 @@
     loadZxing(function(){
       try {
         zxingReader = new window.ZXing.BrowserMultiFormatReader();
-        scanMsg.textContent = "เล็งกล้องไปที่บาร์โค้ด / QR โค้ด";
+        scanMsg.textContent = "เล็งกล้องไปที่บาร์โค้ด / QR โค้ด — สแกนไม่ติด? กดปุ่มถ่ายรูปด้านล่าง";
         zxingReader.decodeFromVideoDevice(undefined, "scanVideo", function(result){
           if(result){ onScanned(result.getText ? result.getText() : String(result.text || "")); }
         }).catch(function(err){
@@ -699,6 +716,127 @@
     }
     try { scanVideo.srcObject = null; } catch(e){}
     scanOverlay.className = "overlay";
+  }
+
+  // ---------- read data from a photo (barcode first, then OCR) ----------
+  var ocrPanel = document.getElementById("ocrPanel");
+  var ocrStatus = document.getElementById("ocrStatus");
+  var ocrImg = document.getElementById("ocrImg");
+  var ocrLines = document.getElementById("ocrLines");
+  var scanPhotoInput = document.getElementById("scanPhotoInput");
+
+  document.getElementById("btnScanPhoto").addEventListener("click", function(){ scanPhotoInput.click(); });
+  document.getElementById("btnOcrRetake").addEventListener("click", function(){ scanPhotoInput.click(); });
+  document.getElementById("btnOcrClose").addEventListener("click", function(){ ocrPanel.className = "overlay"; ocrPanel.style.display = "none"; });
+
+  scanPhotoInput.addEventListener("change", function(ev){
+    var file = ev.target.files && ev.target.files[0];
+    if(!file) return;
+    stopScan();
+    processScanPhoto(file);
+    scanPhotoInput.value = "";
+  });
+
+  function applyScannedValue(value, fromOcr){
+    var v = String(value || "").replace(/^\s+|\s+$/g, "");
+    if(scanTargetId === "fSn" && fromOcr){ v = v.replace(/\s+/g, ""); }
+    document.getElementById(scanTargetId).value = v;
+    if(scanTargetId === "fSn"){ checkDupSnLive(); }
+    ocrPanel.className = "overlay";
+    ocrPanel.style.display = "none";
+    showToast("ใส่ข้อมูลแล้ว: " + v);
+  }
+
+  function processScanPhoto(file){
+    ocrPanel.style.display = "flex";
+    ocrPanel.className = "overlay show";
+    ocrLines.innerHTML = "";
+    ocrImg.style.display = "none";
+    ocrStatus.textContent = "กำลังประมวลผลรูป...";
+    var reader = new FileReader();
+    reader.onload = function(e){
+      var img = new Image();
+      img.onload = function(){
+        var maxW = 1600, w = img.width, h2 = img.height;
+        if(w > maxW){ h2 = Math.round(h2 * (maxW / w)); w = maxW; }
+        var canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h2;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h2);
+        var dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+        ocrImg.src = dataUrl; ocrImg.style.display = "block";
+        ocrStatus.textContent = "กำลังหาบาร์โค้ด/QR ในรูป...";
+        decodeBarcodeFromCanvas(canvas, dataUrl, function(value){
+          if(value){ applyScannedValue(value, false); }
+          else { runOcr(canvas); }
+        });
+      };
+      img.onerror = function(){ ocrStatus.textContent = "อ่านไฟล์รูปนี้ไม่ได้ กรุณาถ่ายใหม่"; };
+      img.src = e.target.result;
+    };
+    reader.onerror = function(){ ocrStatus.textContent = "อ่านไฟล์รูปนี้ไม่ได้ กรุณาถ่ายใหม่"; };
+    reader.readAsDataURL(file);
+  }
+
+  function decodeBarcodeFromCanvas(canvas, dataUrl, cb){
+    if(hasNativeDetector){
+      try {
+        new window.BarcodeDetector().detect(canvas).then(function(codes){
+          cb(codes && codes.length ? (codes[0].rawValue || "") : null);
+        }).catch(function(){ cb(null); });
+      } catch(e){ cb(null); }
+      return;
+    }
+    loadZxing(function(){
+      try {
+        var r = new window.ZXing.BrowserMultiFormatReader();
+        r.decodeFromImageUrl(dataUrl).then(function(res){
+          cb(res && res.getText ? res.getText() : null);
+        }).catch(function(){ cb(null); });
+      } catch(e){ cb(null); }
+    }, function(){ cb(null); });
+  }
+
+  function runOcr(canvas){
+    ocrStatus.textContent = "ไม่พบบาร์โค้ด กำลังอ่านข้อความจากรูป (ครั้งแรกอาจใช้เวลา 10-40 วินาที และต้องใช้อินเทอร์เน็ต)...";
+    loadTesseract(function(){
+      window.Tesseract.createWorker("eng+tha").then(function(worker){
+        return worker.recognize(canvas).then(function(ret){
+          try { worker.terminate(); } catch(e){}
+          showOcrLines(ret && ret.data ? ret.data.text : "");
+        });
+      }).catch(function(){
+        ocrStatus.textContent = "อ่านข้อความไม่สำเร็จ (อาจไม่มีอินเทอร์เน็ต) กรุณาพิมพ์เอง หรือถ่ายใหม่";
+      });
+    }, function(){
+      ocrStatus.textContent = "โหลดตัวอ่านข้อความไม่ได้ (ต้องใช้อินเทอร์เน็ต) กรุณาพิมพ์เอง";
+    });
+  }
+
+  function showOcrLines(text){
+    var raw = String(text || "").split(/\r?\n/);
+    var seen = {}, lines = [];
+    for(var i=0;i<raw.length;i++){
+      var t = raw[i].replace(/^\s+|\s+$/g, "");
+      if(t.length < 2 || seen[t]) continue;
+      seen[t] = true; lines.push(t);
+      if(lines.length >= 15) break;
+    }
+    if(!lines.length){
+      ocrStatus.textContent = "ไม่พบข้อความในรูป ลองถ่ายใหม่ให้ใกล้ ชัด และแสงสว่างพอ";
+      return;
+    }
+    ocrStatus.textContent = "แตะบรรทัดที่ต้องการเพื่อใส่ในช่อง" + (scanTargetId === "fSn" ? " (ระบบจะตัดช่องว่างให้อัตโนมัติ)" : "") + " — แก้ไขในฟอร์มได้ภายหลัง";
+    ocrLines.innerHTML = "";
+    for(var j=0;j<lines.length;j++){
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "btn btn-outline btn-block";
+      b.style.cssText = "margin-bottom:6px; justify-content:flex-start; text-align:left;";
+      b.textContent = lines[j];
+      b.setAttribute("data-v", lines[j]);
+      b.addEventListener("click", function(ev){ applyScannedValue(ev.currentTarget.getAttribute("data-v"), true); });
+      ocrLines.appendChild(b);
+    }
   }
 
   // ---------- form save / clear ----------
